@@ -1,0 +1,74 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Information about the expectant mother",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "pregnancyStartDate": { "type": "string", "format": "date" },
+        "location": { "type": "string" },
+        "preferredLanguage": { "type": "string", "enum": ["English", "Pidgin", "Hausa", "Yoruba", "Igbo"] },
+        "learningStreak": { "type": "number" },
+        "lastLearningDate": { "type": "string" },
+        "activeStreak": { "type": "number" },
+        "lastActiveDate": { "type": "string" },
+        "waterStreak": { "type": "number" },
+        "lastWaterDate": { "type": "string" }
+      },
+      "required": ["uid", "pregnancyStartDate"]
+    },
+    "TriageLog": {
+      "title": "Triage Log",
+      "description": "Historical symptom triage sessions",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "symptoms": { "type": "string" },
+        "audioUrl": { "type": "string" },
+        "category": { "type": "string", "enum": ["Routine", "Urgent", "Emergency"] },
+        "advice": { "type": "string" }
+      },
+      "required": ["userId", "timestamp", "symptoms", "category"]
+    },
+    "DrugScan": {
+      "title": "Drug Scan",
+      "description": "Results of scanned medicine verification",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "drugName": { "type": "string" },
+        "activeIngredients": { "type": "array", "items": { "type": "string" } },
+        "safetyStatus": { "type": "string", "enum": ["SAFE", "CAUTION", "UNSAFE"] },
+        "pregnancyWeekAtScan": { "type": "number" },
+        "warnings": { "type": "string" },
+        "isAuthentic": { "type": "boolean" }
+      },
+      "required": ["userId", "timestamp", "drugName", "safetyStatus"]
+    },
+    "Reminder": {
+      "title": "Reminder",
+      "description": "Medication or clinic reminders",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "type": { "type": "string", "enum": ["Medication", "Clinic", "Exercise"] },
+        "title": { "type": "string" },
+        "time": { "type": "string", "format": "time" },
+        "frequency": { "type": "string" },
+        "isActive": { "type": "boolean" }
+      },
+      "required": ["userId", "type", "title", "time"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": { "schema": "UserProfile", "description": "User profiles" },
+    "/users/{uid}/triageLogs/{logId}": { "schema": "TriageLog", "description": "User's triage history" },
+    "/users/{uid}/scans/{scanId}": { "schema": "DrugScan", "description": "User's drug scan history" },
+    "/users/{uid}/reminders/{reminderId}": { "schema": "Reminder", "description": "User's set reminders" }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "MamaSafe AI",
+  "description": "A pocket-sized guardian for expectant mothers, providing AI symptom triage, drug safety scanning, and personalized health guidance.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["AI Triage", "Drug Scanner", "Reminders"]
+}

@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand: #4a6fa5;
+  --color-brand-light: #edf2f7;
+  --color-danger: #e53e3e;
+  --color-warning: #ecc94b;
+  --color-success: #38a169;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+::-webkit-scrollbar {
+  width: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-slate-300 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-slate-400;
+}

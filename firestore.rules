@@ -1,0 +1,111 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // -------------------------------------------------------------------------
+    // Global Deny All
+    // -------------------------------------------------------------------------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Global Helpers
+    // -------------------------------------------------------------------------
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
+    function isVerified() { return isSignedIn() && request.auth.token.email_verified == true; }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    
+    // -------------------------------------------------------------------------
+    // Entity Validations (Hardened)
+    // -------------------------------------------------------------------------
+    
+    function isValidUserProfile(data) {
+      let required = ['uid', 'pregnancyStartDate'];
+      return data.keys().hasAll(required) 
+          && data.uid == request.auth.uid
+          && data.pregnancyStartDate is string && data.pregnancyStartDate.size() <= 64
+          // Numeric bounds to prevent Denial of Wallet/Value Poisoning
+          && (!data.keys().contains('learningStreak') || (data.learningStreak is number && data.learningStreak >= 0 && data.learningStreak <= 1000))
+          && (!data.keys().contains('activeStreak') || (data.activeStreak is number && data.activeStreak >= 0 && data.activeStreak <= 1000))
+          && (!data.keys().contains('waterStreak') || (data.waterStreak is number && data.waterStreak >= 0 && data.waterStreak <= 1000))
+          && (!data.keys().contains('currentWaterCount') || (data.currentWaterCount is number && data.currentWaterCount >= 0 && data.currentWaterCount <= 50));
+    }
+
+    function isValidTriageLog(data) {
+      return data.keys().hasAll(['userId', 'timestamp', 'symptoms', 'category', 'advice'])
+          && data.userId == request.auth.uid
+          && data.symptoms is string && data.symptoms.size() <= 5000
+          && data.advice is string && data.advice.size() <= 5000
+          && data.category in ['Routine', 'Urgent', 'Emergency', 'Reminder'];
+    }
+
+    function isValidDrugScan(data) {
+      return data.keys().hasAll(['userId', 'timestamp', 'drugName', 'safetyStatus'])
+          && data.userId == request.auth.uid
+          && data.drugName is string && data.drugName.size() <= 200
+          && data.safetyStatus in ['SAFE', 'CAUTION', 'UNSAFE'];
+    }
+
+    function isValidReminder(data) {
+      return data.keys().hasAll(['userId', 'type', 'title', 'time', 'isActive'])
+          && data.userId == request.auth.uid
+          && data.title is string && data.title.size() <= 200
+          && data.type in ['Medication', 'Clinic', 'Exercise', 'General']
+          && data.isActive is bool;
+    }
+
+    // -------------------------------------------------------------------------
+    // Routes
+    // -------------------------------------------------------------------------
+
+    match /users/{uid} {
+      allow get: if isOwner(uid) && isValidId(uid);
+      allow create: if isOwner(uid) && isVerified() && isValidId(uid) && isValidUserProfile(incoming());
+      
+      allow update: if isOwner(uid) && isValidId(uid) 
+                    && isValidUserProfile(incoming())
+                    && incoming().uid == existing().uid // Immutable UID
+                    && (
+                      // Action: Update Basic Profile
+                      incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'location', 'preferredLanguage', 'pregnancyStartDate', 'photoURL']) ||
+                      // Action: Health Trackers (Streaks/Water)
+                      incoming().diff(existing()).affectedKeys().hasAll(['lastWaterDate', 'currentWaterCount']) ||
+                      incoming().diff(existing()).affectedKeys().hasAny(['activeStreak', 'lastActiveDate', 'learningStreak', 'lastLearningDate', 'waterStreak', 'lastWaterGoalDate', 'healthScore'])
+                    );
+      
+      match /triageLogs/{logId} {
+        allow list: if isOwner(uid);
+        allow get: if isOwner(uid) && isValidId(logId);
+        allow create: if isOwner(uid) && isVerified() && isValidId(logId) 
+                     && isValidTriageLog(incoming())
+                     && incoming().timestamp == request.time;
+      }
+
+      match /scans/{scanId} {
+        allow list: if isOwner(uid);
+        allow get: if isOwner(uid) && isValidId(scanId);
+        allow create: if isOwner(uid) && isVerified() && isValidId(scanId) 
+                     && isValidDrugScan(incoming())
+                     && incoming().timestamp == request.time;
+        allow delete: if isOwner(uid) && isValidId(scanId);
+      }
+
+      match /reminders/{reminderId} {
+        allow list: if isOwner(uid);
+        allow get: if isOwner(uid) && isValidId(reminderId);
+        allow create: if isOwner(uid) && isVerified() && isValidId(reminderId) 
+                     && isValidReminder(incoming())
+                     && incoming().createdAt == request.time;
+        allow update: if isOwner(uid) && isValidId(reminderId)
+                     && isValidReminder(incoming())
+                     && (incoming().updatedAt == request.time || !incoming().diff(existing()).affectedKeys().hasAny(['updatedAt']))
+                     && incoming().userId == existing().userId
+                     && incoming().createdAt == existing().createdAt;
+        allow delete: if isOwner(uid) && isValidId(reminderId);
+      }
+    }
+  }
+}
